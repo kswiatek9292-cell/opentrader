@@ -13,3 +13,5 @@ export const exchanges: Record<ExchangeCode, ReturnType<typeof createExchange>> 
 } as const;
 
 export { exchangeCodeMapCCXT };
+export { RealisticPaperExchange } from "./ccxt/realistic-paper-exchange.js";
+export type { RealisticPaperConfig, TradeLogEntry, PnLSummary } from "./ccxt/realistic-paper-exchange.js";

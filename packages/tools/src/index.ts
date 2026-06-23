@@ -21,3 +21,6 @@ export * from "./symbolId/index.js";
 export * from "./symbol/index.js";
 export * from "./candlesticks/index.js";
 export * from "./currency/index.js";
+export * from "./auto-detect/index.js";
+export * from "./notifications/index.js";
+export * from "./scheduler/index.js";
