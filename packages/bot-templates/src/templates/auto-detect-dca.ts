@@ -33,8 +33,8 @@ export function* autoDetectDca(ctx: TBotContext<AutoDetectDCABotConfig>) {
   }
 
   if (onStart) {
-    logger.info(`[AutoDetectDCA] Bot started — will auto-detect profitable pairs`);
-    return;
+    logger.info(`[AutoDetectDCA] Bot started — scanning for profitable pairs...`);
+    // Don't return — fall through to immediately scan on first start
   }
 
   // Step 1: Fetch all tickers and markets from the exchange
@@ -173,6 +173,7 @@ autoDetectDca.schema = z.object({
 });
 
 autoDetectDca.runPolicy = {
+  onOrderFilled: true,
   onCandleClosed: true,
 } satisfies Template["runPolicy"];
 
