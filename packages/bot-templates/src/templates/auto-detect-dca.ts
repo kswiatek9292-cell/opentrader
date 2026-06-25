@@ -23,7 +23,7 @@ import type { CandleData, ProfitabilityResult } from "@opentrader/tools";
  * The bot periodically re-scans and switches to the most profitable pair.
  */
 export function* autoDetectDca(ctx: TBotContext<AutoDetectDCABotConfig>) {
-  const { config, onStart, onStop, exchange, control } = ctx;
+  const { config, onStart, onStop, exchange, control, state } = ctx;
   const { settings } = config;
 
   if (onStop) {
@@ -34,20 +34,27 @@ export function* autoDetectDca(ctx: TBotContext<AutoDetectDCABotConfig>) {
 
   if (onStart) {
     logger.info(`[AutoDetectDCA] Bot started — scanning for profitable pairs...`);
-    // Don't return — fall through to immediately scan on first start
+    state.scanStatus = "scanning";
+    state.lastScanAt = new Date().toISOString();
   }
 
   // Step 1: Fetch all tickers and markets from the exchange
-  // Use ccxt directly for fetchTickers (not on IExchange interface)
   let tickers: Record<string, unknown>;
   let markets: Record<string, unknown>;
   try {
     tickers = (yield exchange.ccxt.fetchTickers()) as Record<string, unknown>;
     markets = (yield exchange.loadMarkets()) as Record<string, unknown>;
   } catch (err) {
-    logger.error(`[AutoDetectDCA] Failed to fetch market data: ${err}`);
+    const errorMsg = `Failed to fetch market data: ${err}`;
+    logger.error(`[AutoDetectDCA] ${errorMsg}`);
+    state.scanStatus = "error";
+    state.scanError = errorMsg;
     return;
   }
+
+  const tickerCount = Object.keys(tickers).length;
+  const marketCount = Object.keys(markets).length;
+  logger.info(`[AutoDetectDCA] Fetched ${tickerCount} tickers and ${marketCount} markets`);
 
   // Step 2: Filter pairs by market metrics
   const candidates = detectPairs(
@@ -63,11 +70,15 @@ export function* autoDetectDca(ctx: TBotContext<AutoDetectDCABotConfig>) {
   );
 
   if (candidates.length === 0) {
-    logger.info(`[AutoDetectDCA] No suitable pairs found, waiting...`);
+    logger.info(`[AutoDetectDCA] No suitable pairs found after filtering (quote=${settings.quoteCurrency}, minVol=${settings.minVolume24h}, maxSpread=${settings.maxSpreadPercent}%)`);
+    state.scanStatus = "no_candidates";
+    state.scanResult = `No pairs matched filters (${tickerCount} tickers checked)`;
     return;
   }
 
-  logger.info(`[AutoDetectDCA] Found ${candidates.length} candidate pairs, analyzing profitability...`);
+  logger.info(`[AutoDetectDCA] Found ${candidates.length} candidate pairs, analyzing top ${Math.min(candidates.length, settings.analyzePairCount)}...`);
+  state.candidatesFound = candidates.length;
+  state.topCandidates = candidates.slice(0, 5).map((c) => c.symbol);
 
   // Step 3: Analyze profitability of top candidates using historical candles
   const profitResults: ProfitabilityResult[] = [];
@@ -80,7 +91,10 @@ export function* autoDetectDca(ctx: TBotContext<AutoDetectDCABotConfig>) {
         limit: settings.analysisCandles,
       })) as CandleData[];
 
-      if (rawCandles.length < 50) continue;
+      if (rawCandles.length < 10) {
+        logger.info(`[AutoDetectDCA] ${pair.symbol}: skipped (only ${rawCandles.length} candles)`);
+        continue;
+      }
 
       const result = analyzeProfitability(pair.symbol, rawCandles, {
         dcaAmountPerEntry: settings.dcaAmount,
@@ -103,11 +117,55 @@ export function* autoDetectDca(ctx: TBotContext<AutoDetectDCABotConfig>) {
     }
   }
 
+  if (profitResults.length === 0) {
+    logger.info(`[AutoDetectDCA] No profitability data available, using best candidate by score`);
+    // Fallback: use the best candidate by market score
+    const fallbackPair = candidates[0];
+    yield control.updateBotSymbol(fallbackPair.symbol);
+    state.scanStatus = "fallback";
+    state.detectedPair = fallbackPair.symbol;
+    state.scanResult = `Used fallback pair ${fallbackPair.symbol} (no profitability data)`;
+    state.lastScanAt = new Date().toISOString();
+    logger.info(`[AutoDetectDCA] Fallback pair selected: ${fallbackPair.symbol}`);
+
+    const entryQuantity = settings.dcaAmount / fallbackPair.lastPrice;
+    const options = {
+      symbol: fallbackPair.symbol,
+      quantity: entryQuantity,
+      tpPercent: settings.tpPercent / 100,
+      slPercent: settings.slPercent ? settings.slPercent / 100 : undefined,
+      safetyOrders: settings.safetyOrders.map((so) => ({
+        relativePrice: -so.priceDeviation / 100,
+        quantity: so.quantity,
+      })),
+    };
+
+    const trade: SmartTradeService = yield useDca(options);
+    if (trade.isCompleted()) {
+      yield trade.replace();
+    }
+    return;
+  }
+
   // Step 4: Rank by profitability and pick the best
-  const ranked = rankByProfitability(profitResults, settings.minCompletedDeals, settings.minWinRate);
+  let ranked = rankByProfitability(profitResults, settings.minCompletedDeals, settings.minWinRate);
+
+  // Fallback: relax filters if no pairs pass strict criteria
+  if (ranked.length === 0) {
+    logger.info(`[AutoDetectDCA] No pairs passed strict filters, relaxing to minDeals=1, minWinRate=0.2`);
+    ranked = rankByProfitability(profitResults, 1, 0.2);
+  }
+
+  // Second fallback: just use the best scoring pair regardless of filters
+  if (ranked.length === 0 && profitResults.length > 0) {
+    logger.info(`[AutoDetectDCA] Still no qualifying pairs, using best available by profitability score`);
+    ranked = [...profitResults].sort((a, b) => b.profitabilityScore - a.profitabilityScore);
+  }
 
   if (ranked.length === 0) {
-    logger.info(`[AutoDetectDCA] No profitable pairs found (min deals: ${settings.minCompletedDeals}, min win rate: ${settings.minWinRate})`);
+    logger.info(`[AutoDetectDCA] No profitable pairs found at all`);
+    state.scanStatus = "no_profitable_pairs";
+    state.scanResult = `Analyzed ${profitResults.length} pairs, none qualified`;
     return;
   }
 
@@ -118,6 +176,11 @@ export function* autoDetectDca(ctx: TBotContext<AutoDetectDCABotConfig>) {
 
   // Update the bot's symbol in the database so the dashboard shows the detected pair
   yield control.updateBotSymbol(bestPair.symbol);
+  state.scanStatus = "detected";
+  state.detectedPair = bestPair.symbol;
+  state.scanResult = `${bestPair.symbol} | score=${bestPair.profitabilityScore} winRate=${(bestPair.winRate * 100).toFixed(0)}% profit=${bestPair.totalProfitPercent.toFixed(1)}%`;
+  state.lastScanAt = new Date().toISOString();
+  state.analyzedPairs = profitResults.length;
   logger.info(`[AutoDetectDCA] Bot symbol updated to ${bestPair.symbol}`);
 
   // Step 5: Execute DCA on the best pair
@@ -152,8 +215,8 @@ autoDetectDca.description =
 
 autoDetectDca.schema = z.object({
   quoteCurrency: z.string().default("USDT").describe("Quote currency to filter pairs (e.g. USDT, BTC)"),
-  minVolume24h: z.number().positive().default(500000).describe("Minimum 24h volume in quote currency"),
-  maxSpreadPercent: z.number().positive().default(0.5).describe("Maximum spread in %"),
+  minVolume24h: z.number().positive().default(100000).describe("Minimum 24h volume in quote currency"),
+  maxSpreadPercent: z.number().positive().default(1).describe("Maximum spread in %"),
   candidateLimit: z.number().positive().default(50).describe("Max pairs to scan from market data"),
   analyzePairCount: z.number().positive().default(15).describe("How many top candidates to backtest"),
   analysisTimeframe: z.string().default("1h").describe("Candle timeframe for profitability analysis"),
@@ -162,8 +225,8 @@ autoDetectDca.schema = z.object({
   tpPercent: z.number().positive().default(3).describe("Take Profit in %"),
   slPercent: z.number().positive().optional().describe("Stop Loss in % (optional)"),
   feeRate: z.number().min(0).default(0.001).describe("Trading fee rate (e.g. 0.001 = 0.1%)"),
-  minCompletedDeals: z.number().min(0).default(3).describe("Min completed deals to consider a pair profitable"),
-  minWinRate: z.number().min(0).max(1).default(0.5).describe("Minimum win rate (0-1) to trade a pair"),
+  minCompletedDeals: z.number().min(0).default(1).describe("Min completed deals to consider a pair profitable"),
+  minWinRate: z.number().min(0).max(1).default(0.3).describe("Minimum win rate (0-1) to trade a pair"),
   safetyOrders: z.array(
     z.object({
       quantity: z.number().positive().describe("Safety order quantity"),
