@@ -9,6 +9,7 @@ import {
 } from "@opentrader/types";
 import { xprisma } from "@opentrader/db";
 import { PaperExchange } from "./paper-exchange.js";
+import type { IExchangeCredentials } from "../../types/index.js";
 
 export interface RealisticPaperConfig {
   /** Maker fee rate, e.g. 0.001 for 0.1% */
@@ -46,8 +47,8 @@ export class RealisticPaperExchange extends PaperExchange {
   private config: RealisticPaperConfig;
   private tradeLog: TradeLogEntry[] = [];
 
-  constructor(exchangeCode: ExchangeCode, config: Partial<RealisticPaperConfig> = {}) {
-    super(exchangeCode);
+  constructor(exchangeCode: ExchangeCode, config: Partial<RealisticPaperConfig> = {}, credentials?: IExchangeCredentials) {
+    super(exchangeCode, credentials);
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
 

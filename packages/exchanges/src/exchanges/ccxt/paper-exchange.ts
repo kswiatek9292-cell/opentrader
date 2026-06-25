@@ -43,6 +43,7 @@ import {
 } from "@opentrader/types";
 import { PaperOrder, xprisma } from "@opentrader/db";
 import { CCXTExchange } from "./exchange.js";
+import type { IExchangeCredentials } from "../../types/index.js";
 
 const ORDER_PLACEMENT_DELAY = 100;
 const ORDER_FULFILLMENT_DELAY = 200;
@@ -59,8 +60,9 @@ export class PaperExchange extends CCXTExchange {
   private ordersStatusChanged: Promise<PaperOrder[]> = new Promise((resolve) => (this.resolve = resolve));
   public matchingEnabled = false;
 
-  constructor(exchangeCode: ExchangeCode) {
-    super(exchangeCode);
+  constructor(exchangeCode: ExchangeCode, credentials?: IExchangeCredentials) {
+    // Pass credentials to parent so CCXT has API keys for real market data
+    super(exchangeCode, credentials);
   }
 
   /**
