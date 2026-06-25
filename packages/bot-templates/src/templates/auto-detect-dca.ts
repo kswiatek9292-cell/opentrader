@@ -56,10 +56,12 @@ export function* autoDetectDca(ctx: TBotContext<AutoDetectDCABotConfig>) {
   const marketCount = Object.keys(markets).length;
   logger.info(`[AutoDetectDCA] Fetched ${tickerCount} tickers and ${marketCount} markets`);
 
-  // Diagnostic: sample a few tickers to understand data structure
+  // Diagnostic: sample ticker symbols to understand format
   const tickerEntries = Object.entries(tickers as Record<string, Record<string, unknown>>);
-  const usdtTickers = tickerEntries.filter(([s]) => s.endsWith("/USDT"));
-  logger.info(`[AutoDetectDCA] USDT pairs in tickers: ${usdtTickers.length}`);
+  const sampleSymbols = tickerEntries.slice(0, 5).map(([s]) => s);
+  logger.info(`[AutoDetectDCA] Sample ticker symbols: ${sampleSymbols.join(", ")}`);
+  const usdtTickers = tickerEntries.filter(([s]) => s.includes("USDT"));
+  logger.info(`[AutoDetectDCA] Tickers containing USDT: ${usdtTickers.length}`);
   if (usdtTickers.length > 0) {
     const sample = usdtTickers[0];
     const t = sample[1];
@@ -70,10 +72,36 @@ export function* autoDetectDca(ctx: TBotContext<AutoDetectDCABotConfig>) {
   const spotMarkets = marketEntries.filter(([, m]) => m.type === "spot" && m.active !== false);
   const usdtSpotMarkets = spotMarkets.filter(([, m]) => m.quote === settings.quoteCurrency);
   logger.info(`[AutoDetectDCA] Spot markets: ${spotMarkets.length}, ${settings.quoteCurrency} spot: ${usdtSpotMarkets.length}`);
+  // Check which spot USDT markets have matching tickers
+  const tickerKeys = new Set(Object.keys(tickers));
+  const spotWithTicker = usdtSpotMarkets.filter(([s]) => tickerKeys.has(s));
+  const spotWithoutTicker = usdtSpotMarkets.filter(([s]) => !tickerKeys.has(s));
+  logger.info(`[AutoDetectDCA] USDT spot with ticker: ${spotWithTicker.length}, without: ${spotWithoutTicker.length}`);
+  if (spotWithoutTicker.length > 0 && spotWithTicker.length === 0) {
+    // Tickers might use different symbol format — try fetching spot tickers only
+    logger.info(`[AutoDetectDCA] Ticker/market symbol mismatch! Sample market: ${usdtSpotMarkets[0]?.[0]}, sample ticker: ${sampleSymbols[0]}`);
+  }
 
   // Step 2: Filter pairs by market metrics
+  // If no tickers match spot market symbols, fetch spot tickers specifically
+  let effectiveTickers = tickers;
+  if (spotWithTicker.length === 0 && usdtSpotMarkets.length > 0) {
+    logger.info(`[AutoDetectDCA] No ticker/market overlap — fetching spot tickers via fetchTickers({type:"spot"})...`);
+    try {
+      const spotTickers = (yield exchange.ccxt.fetchTickers(undefined, { type: "spot" })) as Record<string, unknown>;
+      const spotTickerCount = Object.keys(spotTickers).length;
+      logger.info(`[AutoDetectDCA] Fetched ${spotTickerCount} spot tickers`);
+      if (spotTickerCount > 0) {
+        effectiveTickers = spotTickers;
+      }
+    } catch (err) {
+      logger.warn(`[AutoDetectDCA] Failed to fetch spot tickers: ${err}`);
+      // Fall through to use original tickers
+    }
+  }
+
   const candidates = detectPairs(
-    tickers as Parameters<typeof detectPairs>[0],
+    effectiveTickers as Parameters<typeof detectPairs>[0],
     markets as Parameters<typeof detectPairs>[1],
     {
       quoteCurrency: settings.quoteCurrency,
