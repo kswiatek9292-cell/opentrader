@@ -285,12 +285,13 @@ function simulateDeal(
 
   // Deal still open at end of data
   const lastCandle = candles[candles.length - 1];
+  const finalAvgPrice = totalCost / totalQty;
   const sellValue = totalQty * lastCandle.close;
   const sellFee = sellValue * cfg.feeRate;
   const profit = sellValue - sellFee - totalCost;
   return {
     entryPrice,
-    avgPrice,
+    avgPrice: finalAvgPrice,
     totalQuantity: totalQty,
     totalInvested: totalCost,
     safetyOrdersTriggered: soTriggered,
