@@ -14,4 +14,5 @@ export interface IBotControl {
   cancelSmartTrade: (ref: string) => Promise<boolean>;
   getOpenTrades: () => Promise<Trade[]>;
   getExchange: (label: string) => Promise<IExchange | null>;
+  updateBotSymbol: (symbol: string) => Promise<void>;
 }

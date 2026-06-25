@@ -52,9 +52,12 @@ export async function createBot({ ctx, input }: Options) {
 
   const botType = strategy.strategyFn.botType || XBotType.Bot;
 
+  const symbol = data.symbol || (data.template === "autoDetectDca" ? "SCANNING" : "BTC/USDT");
+
   const bot = await xprisma.bot.custom.create({
     data: {
       ...data,
+      symbol,
       settings: JSON.stringify(data.settings),
       type: botType in XBotType ? botType : XBotType.Bot,
       exchangeAccount: {

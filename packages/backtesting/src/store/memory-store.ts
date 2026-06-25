@@ -345,4 +345,8 @@ export class MemoryStore implements IStore {
   async getExchange(_label: string): Promise<IExchange | null> {
     throw new Error("Not implemented yet.");
   }
+
+  async updateBotSymbol(_botId: number, _symbol: string): Promise<void> {
+    // No-op for backtesting
+  }
 }

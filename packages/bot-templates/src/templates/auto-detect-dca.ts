@@ -23,7 +23,7 @@ import type { CandleData, ProfitabilityResult } from "@opentrader/tools";
  * The bot periodically re-scans and switches to the most profitable pair.
  */
 export function* autoDetectDca(ctx: TBotContext<AutoDetectDCABotConfig>) {
-  const { config, onStart, onStop, exchange } = ctx;
+  const { config, onStart, onStop, exchange, control } = ctx;
   const { settings } = config;
 
   if (onStop) {
@@ -116,6 +116,10 @@ export function* autoDetectDca(ctx: TBotContext<AutoDetectDCABotConfig>) {
     `[AutoDetectDCA] Best pair: ${bestPair.symbol} | score: ${bestPair.profitabilityScore} | winRate: ${(bestPair.winRate * 100).toFixed(0)}% | profit: ${bestPair.totalProfitPercent.toFixed(1)}% | reversion: ${bestPair.meanReversionScore.toFixed(2)}`,
   );
 
+  // Update the bot's symbol in the database so the dashboard shows the detected pair
+  yield control.updateBotSymbol(bestPair.symbol);
+  logger.info(`[AutoDetectDCA] Bot symbol updated to ${bestPair.symbol}`);
+
   // Step 5: Execute DCA on the best pair
   const lastPrice = candidates.find((c) => c.symbol === bestPair.symbol)?.lastPrice ?? 1;
   const entryQuantity = settings.dcaAmount / lastPrice;
@@ -180,7 +184,13 @@ autoDetectDca.runPolicy = {
 autoDetectDca.timeframe = BarSize.ONE_HOUR;
 
 autoDetectDca.watchers = {
-  watchCandles: ({ symbol }: IBotConfiguration) => symbol,
+  watchCandles: ({ symbol, settings }: IBotConfiguration) => {
+    if (symbol === "SCANNING") {
+      const quote = (settings as { quoteCurrency?: string }).quoteCurrency || "USDT";
+      return `BTC/${quote}`;
+    }
+    return symbol;
+  },
 };
 
 type Template = BotTemplate<AutoDetectDCABotConfig>;
