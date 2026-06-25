@@ -46,17 +46,17 @@ export function detectPairs(
     const bid = ticker.bid ?? 0;
     const ask = ticker.ask ?? 0;
     const lastPrice = ticker.last ?? 0;
-    const volume24h = ticker.quoteVolume ?? 0;
+    const volume24h = ticker.quoteVolume ?? (ticker.baseVolume ? (ticker.baseVolume * lastPrice) : 0);
     const priceChange24hPercent = ticker.percentage ?? 0;
 
-    if (lastPrice <= 0 || bid <= 0 || ask <= 0) continue;
+    if (lastPrice <= 0) continue;
 
     // Volume filter
     if (volume24h < opts.minVolume24h) continue;
 
-    // Spread calculation
-    const spread = ((ask - bid) / bid) * 100;
-    if (spread > opts.maxSpreadPercent) continue;
+    // Spread calculation — skip spread filter if bid/ask not available
+    const spread = (bid > 0 && ask > 0) ? ((ask - bid) / bid) * 100 : 0;
+    if (bid > 0 && ask > 0 && spread > opts.maxSpreadPercent) continue;
 
     // Price change filter
     if (Math.abs(priceChange24hPercent) < opts.minPriceChange24hPercent) continue;

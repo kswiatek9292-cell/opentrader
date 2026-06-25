@@ -56,6 +56,21 @@ export function* autoDetectDca(ctx: TBotContext<AutoDetectDCABotConfig>) {
   const marketCount = Object.keys(markets).length;
   logger.info(`[AutoDetectDCA] Fetched ${tickerCount} tickers and ${marketCount} markets`);
 
+  // Diagnostic: sample a few tickers to understand data structure
+  const tickerEntries = Object.entries(tickers as Record<string, Record<string, unknown>>);
+  const usdtTickers = tickerEntries.filter(([s]) => s.endsWith("/USDT"));
+  logger.info(`[AutoDetectDCA] USDT pairs in tickers: ${usdtTickers.length}`);
+  if (usdtTickers.length > 0) {
+    const sample = usdtTickers[0];
+    const t = sample[1];
+    logger.info(`[AutoDetectDCA] Sample ticker ${sample[0]}: last=${t.last} bid=${t.bid} ask=${t.ask} quoteVolume=${t.quoteVolume} baseVolume=${t.baseVolume} percentage=${t.percentage}`);
+  }
+  // Check how many markets are spot
+  const marketEntries = Object.entries(markets as Record<string, Record<string, unknown>>);
+  const spotMarkets = marketEntries.filter(([, m]) => m.type === "spot" && m.active !== false);
+  const usdtSpotMarkets = spotMarkets.filter(([, m]) => m.quote === settings.quoteCurrency);
+  logger.info(`[AutoDetectDCA] Spot markets: ${spotMarkets.length}, ${settings.quoteCurrency} spot: ${usdtSpotMarkets.length}`);
+
   // Step 2: Filter pairs by market metrics
   const candidates = detectPairs(
     tickers as Parameters<typeof detectPairs>[0],
