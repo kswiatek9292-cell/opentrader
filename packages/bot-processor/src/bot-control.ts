@@ -86,4 +86,8 @@ export class BotControl<T extends IBotConfiguration> implements IBotControl {
   async getExchange(label: string) {
     return this.store.getExchange(label);
   }
+
+  async updateBotSymbol(symbol: string) {
+    return this.store.updateBotSymbol(this.bot.id, symbol);
+  }
 }

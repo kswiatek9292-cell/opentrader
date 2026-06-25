@@ -19,4 +19,6 @@ export interface IStore {
   getOpenTrades: (botId: number) => Promise<Trade[]>;
 
   getExchange: (label: string) => Promise<IExchange | null>;
+
+  updateBotSymbol: (botId: number, symbol: string) => Promise<void>;
 }

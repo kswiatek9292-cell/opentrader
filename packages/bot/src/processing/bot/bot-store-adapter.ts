@@ -160,6 +160,14 @@ export class BotStoreAdapter implements IStore {
     return exchangeProvider.fromAccount(exchangeAccount);
   }
 
+  async updateBotSymbol(botId: number, symbol: string) {
+    await xprisma.bot.update({
+      where: { id: botId },
+      data: { symbol },
+    });
+    logger.info(`BotStoreAdapter: Bot ${botId} symbol updated to "${symbol}"`);
+  }
+
   async getOpenTrades(botId: number) {
     const trades = await xprisma.smartTrade.findMany({
       where: {

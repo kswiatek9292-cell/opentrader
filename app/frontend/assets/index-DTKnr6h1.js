@@ -46742,10 +46742,8 @@ const Oke = (c) => {
       f = (p) => {
         if (!p.exchangeCode) return { exchangeCode: "Required" };
         if (!p.name) return { name: "Required" };
-        if (!p.isPaperAccount) {
-          if (!p.apiKey) return { apiKey: "Required" };
-          if (!p.secretKey) return { secretKey: "Required" };
-        }
+        if (!p.apiKey) return { apiKey: "Required" };
+        if (!p.secretKey) return { secretKey: "Required" };
       };
     return P.jsx(Zt, {
       children: P.jsx(IG, {
@@ -46766,15 +46764,13 @@ const Oke = (c) => {
                   P.jsx(zt, { xs: 12, children: P.jsx(LG, {}) }),
                   P.jsx(zt, { xs: 12, children: P.jsx(BG, {}) }),
                   P.jsx(Vu, {}),
-                  g.isDemoAccount || !g.isPaperAccount
-                    ? P.jsxs(P.Fragment, {
+                  P.jsxs(P.Fragment, {
                         children: [
                           P.jsx(zt, { xs: 12, children: P.jsx(RG, {}) }),
                           P.jsx(zt, { xs: 12, children: P.jsx(qG, {}) }),
                           P.jsx(zt, { xs: 12, children: P.jsx(DG, {}) }),
                         ],
-                      })
-                    : null,
+                      }),
                   n ? P.jsx(zt, { xs: 12, children: P.jsx(EG, {}) }) : null,
                   P.jsx(zt, {
                     container: !0,
@@ -46880,10 +46876,8 @@ const Cke = (c) => {
       p = (m) => {
         if (!m.exchangeCode) return { exchangeCode: "Required" };
         if (!m.name) return { name: "Required" };
-        if (!m.isPaperAccount) {
-          if (!m.apiKey) return { apiKey: "Required" };
-          if (!m.secretKey) return { secretKey: "Required" };
-        }
+        if (!m.apiKey) return { apiKey: "Required" };
+        if (!m.secretKey) return { secretKey: "Required" };
       };
     return P.jsx(Zt, {
       children: P.jsx(IG, {
@@ -46905,15 +46899,13 @@ const Cke = (c) => {
                   P.jsx(zt, { xs: 12, children: P.jsx(Pke, { disabled: !0, value: s.id }) }),
                   P.jsx(zt, { xs: 12, children: P.jsx(BG, {}) }),
                   P.jsx(Vu, {}),
-                  y.isDemoAccount || !y.isPaperAccount
-                    ? P.jsxs(P.Fragment, {
+                  P.jsxs(P.Fragment, {
                         children: [
                           P.jsx(zt, { xs: 12, children: P.jsx(RG, {}) }),
                           P.jsx(zt, { xs: 12, children: P.jsx(qG, {}) }),
                           P.jsx(zt, { xs: 12, children: P.jsx(DG, {}) }),
                         ],
-                      })
-                    : null,
+                      }),
                   r ? P.jsx(zt, { xs: 12, children: P.jsx(EG, {}) }) : null,
                   P.jsx(zt, {
                     container: !0,

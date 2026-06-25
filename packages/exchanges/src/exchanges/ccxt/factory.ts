@@ -5,7 +5,7 @@ import type { IExchangeCredentials } from "../../types/index.js";
 
 export function createExchange(exchangeCode: ExchangeCode) {
   return (credentials?: IExchangeCredentials, isDemoAccount?: boolean) => {
-    if (credentials?.isPaperAccount) return new PaperExchange(exchangeCode);
+    if (credentials?.isPaperAccount) return new PaperExchange(exchangeCode, credentials);
 
     return new CCXTExchange(exchangeCode, credentials, isDemoAccount);
   };

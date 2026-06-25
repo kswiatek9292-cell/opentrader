@@ -9,5 +9,80 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Auto-Detect strategy: hide symbol selector and show info message
+      (function() {
+        var STRATEGY_KEY = 'autoDetectDca';
+        function isAutoDetectPage() {
+          return location.search.indexOf('strategy=' + STRATEGY_KEY) !== -1;
+        }
+        function processForm() {
+          if (!isAutoDetectPage()) {
+            // Remove any previously added badges
+            var old = document.getElementById('auto-detect-pair-badge');
+            if (old) old.remove();
+            // Show symbol selectors that were hidden
+            document.querySelectorAll('[data-auto-hidden]').forEach(function(el) {
+              el.style.display = '';
+              el.removeAttribute('data-auto-hidden');
+            });
+            return;
+          }
+          // Find the symbol selector - it's an Autocomplete with symbol options
+          var autocompletes = document.querySelectorAll('[role="combobox"]');
+          autocompletes.forEach(function(el) {
+            // The symbol selector autocomplete is inside a form group
+            var container = el.closest('.MuiFormControl-root') || el.closest('.MuiAutocomplete-root');
+            if (!container) return;
+            var label = container.querySelector('label');
+            if (label && label.textContent && label.textContent.toLowerCase().indexOf('symbol') !== -1) {
+              var wrapper = container.closest('.MuiGrid-root') || container.parentElement;
+              if (wrapper && !wrapper.hasAttribute('data-auto-hidden')) {
+                wrapper.style.display = 'none';
+                wrapper.setAttribute('data-auto-hidden', '1');
+              }
+            }
+          });
+          // Also try to find by the autocomplete input placeholder
+          var inputs = document.querySelectorAll('input[type="text"]');
+          inputs.forEach(function(input) {
+            var container = input.closest('.MuiAutocomplete-root');
+            if (!container) return;
+            var parent = container.closest('.MuiFormControl-root') || container.parentElement;
+            if (!parent) return;
+            // Check if this looks like a symbol selector (contains currency pair text)
+            var text = input.value || '';
+            if (text.indexOf('/') !== -1 && !parent.hasAttribute('data-auto-hidden')) {
+              parent.style.display = 'none';
+              parent.setAttribute('data-auto-hidden', '1');
+            }
+          });
+          // Add badge if not already present
+          if (!document.getElementById('auto-detect-pair-badge')) {
+            var heading = document.querySelectorAll('h2');
+            heading.forEach(function(h) {
+              if (h.textContent === 'Bot settings') {
+                var badge = document.createElement('div');
+                badge.id = 'auto-detect-pair-badge';
+                badge.style.cssText = 'background:#e3f2fd;color:#1565c0;padding:8px 16px;border-radius:8px;margin:8px 0;font-size:14px;display:flex;align-items:center;gap:8px;';
+                badge.innerHTML = '&#x1F50D; Trading pair will be auto-detected based on profitability analysis';
+                h.parentElement.insertBefore(badge, h.nextSibling);
+              }
+            });
+          }
+        }
+        // Watch for DOM changes and URL changes
+        var observer = new MutationObserver(function() { setTimeout(processForm, 100); });
+        observer.observe(document.body || document.documentElement, { childList: true, subtree: true });
+        // Also watch for navigation
+        var lastUrl = location.href;
+        setInterval(function() {
+          if (location.href !== lastUrl) {
+            lastUrl = location.href;
+            setTimeout(processForm, 300);
+          }
+        }, 500);
+      })();
+    </script>
   </body>
 </html>

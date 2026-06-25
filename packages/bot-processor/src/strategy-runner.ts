@@ -79,14 +79,21 @@ export class StrategyRunner<T extends IBotConfiguration> {
 
     for (; !item.done; ) {
       if (item.value instanceof Promise) {
-        const result = await item.value;
-
-        item = generator.next(result);
+        try {
+          const result = await item.value;
+          item = generator.next(result);
+        } catch (err) {
+          item = generator.throw(err);
+        }
       } else if (isEffect(item.value)) {
         const effect = item.value;
         const effectRunner = effectRunnerMap[effect.type];
 
-        item = generator.next(await effectRunner(effect, context));
+        try {
+          item = generator.next(await effectRunner(effect, context));
+        } catch (err) {
+          item = generator.throw(err);
+        }
       } else if (isNestedGenerator(item.value)) {
         throw new Error("Nested generator detected. You must use yield* instead of yield");
       } else {

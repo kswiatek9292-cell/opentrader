@@ -10,7 +10,7 @@ export const ZCreateBotInputSchema = z.object({
     template: true,
     timeframe: true,
     logging: true,
-  }),
+  }).partial({ symbol: true }),
 });
 
 export type TCreateBotInputSchema = z.infer<typeof ZCreateBotInputSchema>;
